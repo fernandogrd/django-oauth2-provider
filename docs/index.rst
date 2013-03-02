@@ -35,4 +35,4 @@ Changes
 Made by `Caffeinehit <http://www.caffeinehit.com/>`_.
 
 .. _OAuth2: http://tools.ietf.org/html/rfc6749
-.. _repository: https://github.com/caffeinehit/django-oauth2-provider/blob/master/example/
+.. _repository: https://github.com/dulaccc/django-oauth2-provider/blob/master/example/

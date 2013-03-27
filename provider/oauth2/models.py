@@ -4,14 +4,19 @@ implement these models with fields and and methods to be compatible with the
 views in :attr:`provider.views`.
 """
 
-from datetime import datetime
 from django.db import models
 from django.conf import settings
 from .. import constants
 from ..constants import CLIENT_TYPES
 from ..utils import short_token, long_token, get_token_expiry
 from ..utils import get_code_expiry
+from ..utils import now
 from .managers import AccessTokenManager
+
+try:
+    from django.utils import timezone
+except ImportError:
+    timezone = None
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
@@ -30,7 +35,7 @@ class Client(models.Model):
     * :attr:`client_secret`
     * :attr:`client_type`
 
-    Clients are outlined in the :draft:`2` and its subsections.
+    Clients are outlined in the :rfc:`2` and its subsections.
     """
     user = models.ForeignKey(AUTH_USER_MODEL, related_name='oauth2_client',
         blank=True, null=True)
@@ -50,7 +55,7 @@ class Grant(models.Model):
     Default grant implementation. A grant is a code that can be swapped for an
     access token. Grants have a limited lifetime as defined by
     :attr:`provider.constants.EXPIRE_CODE_DELTA` and outlined in
-    :draft:`4.1.2`
+    :rfc:`4.1.2`
 
     Expected fields:
 
@@ -77,7 +82,7 @@ class AccessToken(models.Model):
     Default access token implementation. An access token is a time limited
     token to access a user's resources.
 
-    Access tokens are outlined :draft:`5`.
+    Access tokens are outlined :rfc:`5`.
 
     Expected fields:
 
@@ -104,11 +109,24 @@ class AccessToken(models.Model):
     def __unicode__(self):
         return self.token
 
-    def get_expire_delta(self):
+    def get_expire_delta(self, reference=None):
         """
         Return the number of seconds until this token expires.
         """
-        return (self.expires - datetime.now()).seconds
+        if reference is None:
+            reference = now()
+        expiration = self.expires
+
+        if timezone:
+            if timezone.is_aware(reference) and timezone.is_naive(expiration):
+                # MySQL doesn't support timezone for datetime fields
+                # so we assume that the date was stored in the UTC timezone
+                expiration = timezone.make_aware(expiration, timezone.utc)
+            elif timezone.is_naive(reference) and timezone.is_aware(expiration):
+                reference = timezone.make_aware(reference, timezone.utc)
+
+        timedelta = expiration - reference
+        return timedelta.days*86400 + timedelta.seconds
 
 
 class RefreshToken(models.Model):
